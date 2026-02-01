@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { NewsSection } from "@/components/NewsSection";
+import { AssignmentPlanner } from "@/components/AssignmentPlanner";
 import { YouTubeSection } from "@/components/YouTubeSection";
-import { TwitterSection } from "@/components/TwitterSection";
+import { ShortsSection } from "@/components/ShortsSection";
 import { LinkViewer } from "@/components/LinkViewer";
 
 export default function Dashboard() {
@@ -23,9 +23,9 @@ export default function Dashboard() {
       {/* Dashboard Grid */}
       <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-8rem)]">
-          {/* Top Left: News */}
+          {/* Top Left: Assignments */}
           <div className="min-h-[300px] md:min-h-0">
-            <NewsSection />
+            <AssignmentPlanner />
           </div>
 
           {/* Top Right: YouTube */}
@@ -33,9 +33,9 @@ export default function Dashboard() {
             <YouTubeSection />
           </div>
 
-          {/* Bottom Left: Twitter */}
+          {/* Bottom Left: Shorts */}
           <div className="min-h-[300px] md:min-h-0">
-            <TwitterSection />
+            <ShortsSection />
           </div>
 
           {/* Bottom Right: Link Viewer */}

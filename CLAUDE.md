@@ -1,6 +1,6 @@
 # World Dashboard
 
-A personal dashboard for aggregating content from YouTube, Twitter/X, news sources, and viewing embedded links.
+A personal dashboard for aggregating content from YouTube, YouTube Shorts, news sources, and viewing embedded links.
 
 ## Tech Stack
 
@@ -21,7 +21,7 @@ app/
     _cache.ts              # In-memory cache with 6-hour TTL
     embed/route.ts         # URL embed extraction (YouTube, Twitter, articles)
     news/route.ts          # News aggregation + AI filtering API
-    twitter/route.ts       # Twitter/X API integration (placeholder)
+    shorts/route.ts        # YouTube Shorts fetching with 1-hour TTL
     youtube/route.ts         # YouTube video fetching with filters
     youtube/resolve/route.ts # YouTube URL → channel ID resolution
     youtube/categorize/route.ts  # AI-based channel categorization
@@ -31,7 +31,7 @@ components/
   LinkViewer.tsx      # URL paste & embed viewer with recent links
   NewsSection.tsx     # News feed display (AI-curated)
   YouTubeSection.tsx  # YouTube videos with thumbnails, duration, view count
-  TwitterSection.tsx  # Twitter/X feed (placeholder)
+  ShortsSection.tsx   # YouTube Shorts feed with fullscreen viewer
   SectionHeader.tsx   # Reusable section header component
   EmptyState.tsx      # Empty state placeholder
 
@@ -67,7 +67,7 @@ npm run lint    # Run ESLint
 - Falls back to stale data if refresh fails
 
 ### Auto-refresh Behavior
-- Feed sections (News, YouTube, Twitter) auto-refresh every 6 hours
+- Feed sections (News, YouTube) auto-refresh every 6 hours; Shorts refreshes every 1 hour
 - Server cache controls actual data fetching cost
 - Client polls every 6 hours while page is open
 - `lastChecked` in UI shows when data was actually generated
@@ -134,6 +134,18 @@ npm run lint    # Run ESLint
 - Move channels between groups via dropdown
 - Groups displayed as collapsible sections with channel count
 
+### YouTube Shorts Feed (`/api/shorts`)
+- Fetches recent uploads from configured Shorts channels via `playlistItems.list`
+- Enriches with `videos.list` to get duration + view count
+- Filters to Shorts only: duration ≤ 60 seconds
+- Filters by minimum view count (default 10K) for quality
+- Randomly samples configured count (default 10) from pool
+- 1-hour cache TTL (separate from 6-hour YouTube/news cache)
+- Fullscreen viewer with vertical scroll-snap (TikTok/Reels UX)
+- Channels stored in localStorage (`shortsChannels` key)
+- Preferences stored in localStorage (`shortsPreferences` key)
+- Pre-seeded with default channels (TED-Ed, Veritasium, School of Life, Huberman)
+
 ### Link Viewer (`/api/embed`)
 - Accepts any URL via POST request
 - Extracts and returns embed HTML for:
@@ -145,7 +157,7 @@ npm run lint    # Run ESLint
 
 ### Dashboard Layout
 - 4-panel responsive grid layout
-- Sections: News, YouTube, Twitter, Link Viewer
+- Sections: News, YouTube, Shorts, Link Viewer
 - Dark/light theme via CSS variables
 
 ## CSS Variables (Theme)
@@ -161,7 +173,6 @@ npm run lint    # Run ESLint
 ## Known Limitations
 
 - YouTube embeds may show "bot check" when using VPN (YouTube restriction)
-- Twitter embeds require the Twitter widget script for full rendering
 - Instagram embeds require additional OAuth setup
 - Some RSS feeds may block requests even with User-Agent (403 errors)
 

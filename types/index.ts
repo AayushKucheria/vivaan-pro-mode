@@ -1,43 +1,53 @@
-export interface NewsItem {
-  id: string;
-  title: string;
-  url: string;
-  source: string;
-  publishedAt: string; // ISO string for JSON serialization
-  summary?: string;
-  score?: number; // AI-computed relevance score (0-100)
-}
-
-export interface NewsSource {
+export interface Assignment {
   id: string;
   name: string;
-  url: string;
-  enabled: boolean;
-  isCustom?: boolean; // true for user-added feeds
+  dueDate: string; // ISO string
+  estimatedHours: number;
+  priority: "high" | "medium" | "low";
+  completed: boolean;
+  createdAt: string; // ISO string
 }
 
-// Default news sources - shared between settings and API
-export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
-  // World + Geopolitics
-  { id: "bbc-world", name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", enabled: true },
-  { id: "aljazeera", name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml", enabled: true },
+export interface DailyScheduleBlock {
+  date: string; // YYYY-MM-DD
+  assignmentId: string;
+  assignmentName: string;
+  hours: number;
+  startTime?: string; // HH:MM
+  endTime?: string;   // HH:MM
+  isManualOverride?: boolean;
+}
 
-  // India
-  { id: "thehindu", name: "The Hindu", url: "https://www.thehindu.com/news/national/feeder/default.rss", enabled: true },
-  { id: "indianexpress", name: "Indian Express", url: "https://indianexpress.com/section/india/feed/", enabled: true },
+export interface WorkSchedule {
+  blocks: DailyScheduleBlock[];
+  generatedAt: string; // ISO string
+  assignmentIds: string[];
+  reasoning?: string;
+  calendarUsed?: boolean;
+}
 
-  // Cricket
-  { id: "espncricinfo", name: "ESPNcricinfo", url: "https://www.espncricinfo.com/rss/content/story/feeds/0.xml", enabled: true },
+export interface CalendarFreeSlot {
+  date: string;  // YYYY-MM-DD
+  start: string; // HH:MM
+  end: string;   // HH:MM
+}
 
-  // AI / Tech
-  { id: "mit-tech-ai", name: "MIT Tech Review AI", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/", enabled: true },
-  { id: "openai-blog", name: "OpenAI Blog", url: "https://openai.com/blog/rss/", enabled: true },
+export interface CalendarBusySlot {
+  start: string; // ISO string
+  end: string;   // ISO string
+}
 
-  // Reddit
-  { id: "r-worldnews", name: "r/worldnews", url: "https://www.reddit.com/r/worldnews/.rss", enabled: true },
-  { id: "r-india", name: "r/india", url: "https://www.reddit.com/r/india/.rss", enabled: true },
-  { id: "r-machinelearning", name: "r/MachineLearning", url: "https://www.reddit.com/r/MachineLearning/.rss", enabled: true },
-];
+export interface AssignmentPreferences {
+  defaultWorkHoursPerDay: number;
+  wakeTime: string;  // HH:MM format, default "09:00"
+  sleepTime: string; // HH:MM format, default "22:00"
+}
+
+export const DEFAULT_ASSIGNMENT_PREFERENCES: AssignmentPreferences = {
+  defaultWorkHoursPerDay: 4,
+  wakeTime: "09:00",
+  sleepTime: "22:00",
+};
 
 export interface YouTubeVideo {
   id: string;
@@ -115,5 +125,41 @@ export interface RecentLink {
 export interface DashboardSettings {
   newsSources: string[];
   youtubeConnected: boolean;
-  twitterConnected: boolean;
 }
+
+export interface ShortsChannel {
+  id: string;
+  name: string;
+  handle?: string;
+  thumbnail?: string;
+  enabled: boolean;
+}
+
+export interface ShortVideo {
+  id: string;
+  title: string;
+  channelName: string;
+  channelId: string;
+  thumbnail: string;
+  url: string;
+  publishedAt: string;
+  duration: string;
+  viewCount: number;
+}
+
+export interface ShortsPreferences {
+  shortsCount: number; // default 10
+  minViewCount: number; // default 10000
+}
+
+export const DEFAULT_SHORTS_PREFERENCES: ShortsPreferences = {
+  shortsCount: 10,
+  minViewCount: 10000,
+};
+
+export const DEFAULT_SHORTS_CHANNELS: ShortsChannel[] = [
+  { id: "UCsooa4yRKGN_zEE8iknghZA", name: "TED-Ed", enabled: true },
+  { id: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium", enabled: true },
+  { id: "UC7IcJI8PUf5Z3zKxnZvTBog", name: "The School of Life", enabled: true },
+  { id: "UCVHFbqXqoYvEWM1Ddxl0QDg", name: "Andrew Huberman", enabled: true },
+];

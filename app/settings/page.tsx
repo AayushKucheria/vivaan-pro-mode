@@ -7,8 +7,6 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSeenVideos } from "@/hooks/useSeenVideos";
 import { YouTubeOAuthButton } from "@/components/YouTubeOAuthButton";
 import {
-  NewsSource,
-  DEFAULT_NEWS_SOURCES,
   YouTubeChannel,
   YouTubeFilters,
   DEFAULT_YOUTUBE_FILTERS,
@@ -16,14 +14,24 @@ import {
   DEFAULT_YOUTUBE_PREFERENCES,
   YouTubeChannelGroup,
   DEFAULT_CHANNEL_GROUPS,
+  ShortsChannel,
+  ShortsPreferences,
+  DEFAULT_SHORTS_PREFERENCES,
+  DEFAULT_SHORTS_CHANNELS,
+  Assignment,
+  AssignmentPreferences,
+  DEFAULT_ASSIGNMENT_PREFERENCES,
 } from "@/types";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const [sources, setSources] = useLocalStorage<NewsSource[]>("newsSources", DEFAULT_NEWS_SOURCES);
-  const [newFeedName, setNewFeedName] = useState("");
-  const [newFeedUrl, setNewFeedUrl] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
+  // Assignment preferences state
+  const [assignmentPreferences, setAssignmentPreferences] = useLocalStorage<AssignmentPreferences>(
+    "assignmentPreferences",
+    DEFAULT_ASSIGNMENT_PREFERENCES
+  );
+  const [, setAssignments] = useLocalStorage<Assignment[]>("assignments", []);
+  const [, setWorkSchedule] = useLocalStorage<null>("workSchedule", null);
 
   // YouTube channels state
   const [youtubeChannels, setYoutubeChannels] = useLocalStorage<YouTubeChannel[]>("youtubeChannels", []);
@@ -60,34 +68,55 @@ export default function SettingsPage() {
   const [editingGroupName, setEditingGroupName] = useState("");
   const [categorizingChannels, setCategorizingChannels] = useState(false);
 
-  const toggleSource = (id: string) => {
-    setSources((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
-    );
+  // Shorts state
+  const [shortsChannels, setShortsChannels] = useLocalStorage<ShortsChannel[]>("shortsChannels", DEFAULT_SHORTS_CHANNELS);
+  const [shortsPreferences, setShortsPreferences] = useLocalStorage<ShortsPreferences>("shortsPreferences", DEFAULT_SHORTS_PREFERENCES);
+  const [newShortsChannelUrl, setNewShortsChannelUrl] = useState("");
+  const [showAddShortsChannel, setShowAddShortsChannel] = useState(false);
+  const [shortsChannelLoading, setShortsChannelLoading] = useState(false);
+  const [shortsChannelError, setShortsChannelError] = useState("");
+
+  const addShortsChannel = async () => {
+    if (!newShortsChannelUrl.trim()) return;
+    setShortsChannelLoading(true);
+    setShortsChannelError("");
+
+    try {
+      const res = await fetch("/api/youtube/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: newShortsChannelUrl.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setShortsChannelError(data.error || "Failed to resolve channel");
+        return;
+      }
+
+      if (shortsChannels.some((c) => c.id === data.channelId)) {
+        setShortsChannelError("Channel already added");
+        return;
+      }
+
+      const newChannel: ShortsChannel = {
+        id: data.channelId,
+        name: data.name,
+        handle: data.handle,
+        thumbnail: data.thumbnail,
+        enabled: true,
+      };
+
+      setShortsChannels((prev) => [...prev, newChannel]);
+      setNewShortsChannelUrl("");
+      setShowAddShortsChannel(false);
+    } catch {
+      setShortsChannelError("Failed to resolve channel");
+    } finally {
+      setShortsChannelLoading(false);
+    }
   };
 
-  const removeSource = (id: string) => {
-    setSources((prev) => prev.filter((s) => s.id !== id));
-  };
-
-  const addCustomFeed = () => {
-    if (!newFeedName.trim() || !newFeedUrl.trim()) return;
-
-    const newSource: NewsSource = {
-      id: `custom-${Date.now()}`,
-      name: newFeedName.trim(),
-      url: newFeedUrl.trim(),
-      enabled: true,
-      isCustom: true,
-    };
-
-    setSources((prev) => [...prev, newSource]);
-    setNewFeedName("");
-    setNewFeedUrl("");
-    setShowAddForm(false);
-  };
-
-  const enabledCount = sources.filter((s) => s.enabled).length;
   const enabledChannelsCount = youtubeChannels.filter((c) => c.enabled).length;
 
   const toggleChannel = (id: string) => {
@@ -447,78 +476,93 @@ export default function SettingsPage() {
       </header>
 
       <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
-        {/* News Sources */}
+        {/* Assignment Planner */}
         <section className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium uppercase tracking-wide">
-              News Sources
-              <span className="ml-2 text-[var(--muted)] font-normal normal-case">
-                ({enabledCount} enabled)
-              </span>
-            </h2>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
-            >
-              {showAddForm ? "Cancel" : "+ Add Feed"}
-            </button>
-          </div>
-
-          {/* Add Feed Form */}
-          {showAddForm && (
-            <div className="mb-4 p-3 bg-[var(--card)] border border-[var(--border)] rounded-md space-y-2">
+          <h2 className="text-sm font-medium uppercase tracking-wide mb-3">
+            Assignment Planner
+          </h2>
+          <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-md space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Default Work Hours per Day
+              </label>
               <input
-                type="text"
-                placeholder="Feed name (e.g., Hacker News)"
-                value={newFeedName}
-                onChange={(e) => setNewFeedName(e.target.value)}
+                type="number"
+                value={assignmentPreferences.defaultWorkHoursPerDay}
+                onChange={(e) =>
+                  setAssignmentPreferences((prev) => ({
+                    ...prev,
+                    defaultWorkHoursPerDay: parseFloat(e.target.value) || 4,
+                  }))
+                }
+                min="1"
+                max="16"
+                step="0.5"
                 className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
               />
-              <input
-                type="url"
-                placeholder="RSS URL (e.g., https://news.ycombinator.com/rss)"
-                value={newFeedUrl}
-                onChange={(e) => setNewFeedUrl(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
-              />
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Maximum hours allocated per day when generating schedules
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Wake Time
+                </label>
+                <input
+                  type="time"
+                  value={assignmentPreferences.wakeTime || "09:00"}
+                  onChange={(e) =>
+                    setAssignmentPreferences((prev) => ({
+                      ...prev,
+                      wakeTime: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Sleep Time
+                </label>
+                <input
+                  type="time"
+                  value={assignmentPreferences.sleepTime || "22:00"}
+                  onChange={(e) =>
+                    setAssignmentPreferences((prev) => ({
+                      ...prev,
+                      sleepTime: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-[var(--muted)]">
+              Used for calendar integration to determine available hours
+            </p>
+            <div className="flex gap-2">
               <button
-                onClick={addCustomFeed}
-                disabled={!newFeedName.trim() || !newFeedUrl.trim()}
-                className="px-3 py-1.5 text-sm bg-[var(--foreground)] text-[var(--background)] rounded-md disabled:opacity-50"
+                onClick={() => {
+                  if (confirm("Clear all assignments?")) {
+                    setAssignments([]);
+                  }
+                }}
+                className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-md hover:border-[var(--foreground)] transition-colors"
               >
-                Add
+                Clear All Assignments
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm("Clear generated schedule?")) {
+                    setWorkSchedule(null);
+                  }
+                }}
+                className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-md hover:border-[var(--foreground)] transition-colors"
+              >
+                Clear Schedule
               </button>
             </div>
-          )}
-
-          {/* Sources Grid - compact 2-column layout */}
-          <div className="grid grid-cols-2 gap-2">
-            {sources.map((source) => (
-              <label
-                key={source.id}
-                className="flex items-center gap-2 px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-md cursor-pointer hover:border-[var(--muted)] transition-colors group"
-              >
-                <input
-                  type="checkbox"
-                  checked={source.enabled}
-                  onChange={() => toggleSource(source.id)}
-                  className="w-3.5 h-3.5 rounded border-[var(--border)]"
-                />
-                <span className="flex-1 text-sm truncate">{source.name}</span>
-                {source.isCustom && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      removeSource(source.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-xs text-red-500 hover:text-red-400 transition-opacity"
-                    title="Remove feed"
-                  >
-                    ×
-                  </button>
-                )}
-              </label>
-            ))}
           </div>
         </section>
 
@@ -927,16 +971,142 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Twitter Connection */}
+        {/* Shorts Channels */}
         <section className="mb-8">
-          <h2 className="text-sm font-medium uppercase tracking-wide mb-4">
-            Twitter
-          </h2>
-          <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-md">
-            <p className="text-sm text-[var(--muted)]">
-              Twitter integration is paused for now.
-            </p>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium uppercase tracking-wide">
+              Shorts Channels
+              <span className="ml-2 text-[var(--muted)] font-normal normal-case">
+                ({shortsChannels.filter((c) => c.enabled).length} enabled)
+              </span>
+            </h2>
+            <button
+              onClick={() => {
+                setShowAddShortsChannel(!showAddShortsChannel);
+                setShortsChannelError("");
+              }}
+              className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+            >
+              {showAddShortsChannel ? "Cancel" : "+ Add Channel"}
+            </button>
           </div>
+
+          {showAddShortsChannel && (
+            <div className="mb-4 p-3 bg-[var(--card)] border border-[var(--border)] rounded-md space-y-2">
+              <input
+                type="text"
+                placeholder="YouTube URL (e.g., youtube.com/@MrBeast)"
+                value={newShortsChannelUrl}
+                onChange={(e) => {
+                  setNewShortsChannelUrl(e.target.value);
+                  setShortsChannelError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !shortsChannelLoading) addShortsChannel();
+                }}
+                className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
+              />
+              {shortsChannelError && (
+                <p className="text-xs text-red-500">{shortsChannelError}</p>
+              )}
+              <button
+                onClick={addShortsChannel}
+                disabled={!newShortsChannelUrl.trim() || shortsChannelLoading}
+                className="px-3 py-1.5 text-sm bg-[var(--foreground)] text-[var(--background)] rounded-md disabled:opacity-50"
+              >
+                {shortsChannelLoading ? "Resolving..." : "Add"}
+              </button>
+            </div>
+          )}
+
+          {/* Shorts Preferences */}
+          <div className="mb-4 p-4 bg-[var(--card)] border border-[var(--border)] rounded-md space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Shorts per Refresh</label>
+              <select
+                value={shortsPreferences.shortsCount}
+                onChange={(e) => setShortsPreferences((prev) => ({ ...prev, shortsCount: parseInt(e.target.value, 10) }))}
+                className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
+              >
+                <option value={5}>5 shorts</option>
+                <option value={10}>10 shorts</option>
+                <option value={15}>15 shorts</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Minimum Views</label>
+              <select
+                value={shortsPreferences.minViewCount}
+                onChange={(e) => setShortsPreferences((prev) => ({ ...prev, minViewCount: parseInt(e.target.value, 10) }))}
+                className="w-full px-3 py-2 text-sm bg-transparent border border-[var(--border)] rounded-md focus:outline-none focus:border-[var(--foreground)]"
+              >
+                <option value={1000}>1K views</option>
+                <option value={10000}>10K views</option>
+                <option value={50000}>50K views</option>
+                <option value={100000}>100K views</option>
+                <option value={500000}>500K views</option>
+                <option value={1000000}>1M views</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Shorts Channels List */}
+          {shortsChannels.length === 0 ? (
+            <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-md">
+              <p className="text-sm text-[var(--muted)]">
+                No channels added yet. Add channels that post Shorts.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {shortsChannels.map((channel) => (
+                <div
+                  key={channel.id}
+                  className={`relative p-2 rounded-md border border-[var(--border)] hover:border-[var(--muted)] transition-colors group ${
+                    !channel.enabled ? "opacity-50" : ""
+                  }`}
+                >
+                  <button
+                    onClick={() => setShortsChannels((prev) => prev.filter((c) => c.id !== channel.id))}
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    title="Remove channel"
+                  >
+                    ×
+                  </button>
+                  <div className="flex flex-col items-center text-center">
+                    <div className="relative mb-1">
+                      <label className="cursor-pointer">
+                        {channel.thumbnail ? (
+                          <img src={channel.thumbnail} alt="" className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-[var(--border)]" />
+                        )}
+                        <input
+                          type="checkbox"
+                          checked={channel.enabled}
+                          onChange={() =>
+                            setShortsChannels((prev) =>
+                              prev.map((c) => (c.id === channel.id ? { ...c, enabled: !c.enabled } : c))
+                            )
+                          }
+                          className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded border-[var(--border)]"
+                        />
+                      </label>
+                    </div>
+                    <a
+                      href={`https://www.youtube.com/channel/${channel.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs truncate w-full hover:text-blue-500 transition-colors"
+                      title={channel.name}
+                    >
+                      {channel.name}
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Seen Videos History */}
